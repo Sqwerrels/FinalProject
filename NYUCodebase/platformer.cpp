@@ -35,6 +35,29 @@
 #define MAX_TIMESTEPS 6
 
 
+void worldToTileCoordinates(float worldX, float worldY, int *gridX, int *gridY)
+{
+	*gridX = (int)(worldX / TILE_SIZE);
+	*gridY = (int)(-worldY / TILE_SIZE);
+
+}
+
+bool isSolid(int ind) {
+	//(val == 124 || val == 64 || val == 96 || val == 97 || val == 512 || val == 487 || val == 484
+	//|| val == 488 || val == 516 || val == 518 || val == 586 || val == 557 || val == 159
+	if (ind == 123)
+		return true;
+	if (ind == 158)
+		return true;
+
+
+
+	return false;
+
+
+}
+
+
 
 
 class Tile
@@ -62,8 +85,7 @@ Matrix modelMatrix;
 Matrix projectionMatrix;
 Matrix viewMatrix;
 ShaderProgram *program;
-std::vector<float> vertexData;
-std::vector<float> texCoordData;
+
 std::vector<Tile*> allOfTheTiles;
 const Uint8 *keys = SDL_GetKeyboardState(NULL);
 GLuint sheet;
@@ -84,6 +106,8 @@ class Entity
 public:
 	float xPos;
 	float yPos;
+	int gridx = 0;
+	int gridy = 0;
 	float xLimitLeft;
 	float xLimitRight;
 	float yLimitUp;
@@ -95,15 +119,15 @@ public:
 	float acceleration_x;
 	float acceleration_y;
 	float friction_x;
-	float friction_y;
+	float friction_y = 0.1;
 	bool collidedTop = false;
 	bool collidedBottom = false;
 	bool collidedLeft = false;
 	bool collidedRight = false;
 
 
-	Entity(float x, float y, int texture, float width, float velX, float velY, float accelX, float accelY, float fricX, float fricY) : xPos(x), yPos(y), textureID(texture),
-		acceleration_x(accelX), acceleration_y(accelY), velocity_x(velX), velocity_y(velY)
+	Entity(float x, float y, int texture, float width, float velX, float velY, float accelX, float accelY, float fricX, float fricY, bool collide) : xPos(x), yPos(y), textureID(texture),
+		acceleration_x(accelX), acceleration_y(accelY), velocity_x(velX), velocity_y(velY), collidedBottom(collide)
 	{
 
 	}
@@ -119,21 +143,57 @@ public:
 		program->setModelMatrix(modelMatrix);
 
 	}
+	void collide() {
+		cout << gridx << gridy << endl;
+		worldToTileCoordinates(xPos, yPos - TILE_SIZE/2 , &gridx, &gridy);
+		if (isSolid(levelData[gridy][gridx])){
+			collidedBottom = true;
+		}
+		else {
+			collidedBottom = false;
+		}
+		worldToTileCoordinates(xPos, yPos + TILE_SIZE / 2, &gridx, &gridy);
+		if (isSolid(levelData[gridy][gridx])){
+			collidedTop = true;
+		}
+		else {
+			collidedTop = false;
+		}
+		worldToTileCoordinates(xPos + TILE_SIZE / 2, yPos, &gridx, &gridy);
+		if (isSolid(levelData[gridy][gridx])){
+			collidedRight = true;
+		}
+		else {
+			collidedRight = false;
+		}
+		worldToTileCoordinates(xPos - TILE_SIZE / 2, yPos, &gridx, &gridy);
+		if (isSolid(levelData[gridy][gridx])){
+			collidedLeft = true;
+		}
+		else {
+			collidedLeft = false;
+		}
+	}
 	void movePlayer(float elapsed)
 	{
 
-		/*velocity_x = lerp(velocity_x, 0.0f, FIXED_TIMESTEP * friction_x);
-		velocity_y = lerp(velocity_y, 0.0f, FIXED_TIMESTEP * friction_y);*/
-		velocity_x += acceleration_x * elapsed;
-		velocity_y += acceleration_y * elapsed;
-		xPos += velocity_x * elapsed;
-		yPos += velocity_y * elapsed;
+		cout << velocity_y<< endl;
+		//velocity_x = lerp(velocity_x, 0.0f, FIXED_TIMESTEP * friction_x);
+		velocity_y = lerp(velocity_y, 0.0f, FIXED_TIMESTEP * friction_y);
+		//velocity_y = -1;
+		cout << velocity_y << endl;
+		//velocity_x += acceleration_x * FIXED_TIMESTEP;
+		velocity_y += acceleration_y * FIXED_TIMESTEP;
+		//xPos += velocity_x * FIXED_TIMESTEP;
+		yPos += velocity_y * FIXED_TIMESTEP;
 
+	
 		
-		/*modelMatrix.identity();
-		modelMatrix.Translate(xPos, yPos, 0);
+		
+		modelMatrix.identity();
+		modelMatrix.Translate(0, yPos, 0);
 		program->setModelMatrix(modelMatrix);
-*/
+
 	}
 	
 
@@ -301,12 +361,17 @@ bool readHeader(std::ifstream &stream) {
 
 void render() {
 
+	std::vector<float> vertexData;
+	std::vector<float> texCoordData;
+
+	float marigin = 2 / 21;
+
 	for (int y = 0; y < LEVEL_HEIGHT; y++) {
 		for (int x = 0; x < LEVEL_WIDTH; x++) {
 			if (levelData[y][x] != 0)
 			{
-				float u = (float)(((int)levelData[y][x]) % SPRITE_COUNT_X) / (float)SPRITE_COUNT_X;
-				float v = (float)(((int)levelData[y][x]) / SPRITE_COUNT_X) / (float)SPRITE_COUNT_Y;
+				float u = (float)(((int)levelData[y][x]) % SPRITE_COUNT_X) / (float)SPRITE_COUNT_X + marigin;
+				float v = (float)(((int)levelData[y][x]) / SPRITE_COUNT_X) / (float)SPRITE_COUNT_Y + marigin;
 				float spriteWidth = 1.0f / (float)SPRITE_COUNT_X;
 				float spriteHeight = 1.0f / (float)SPRITE_COUNT_Y;
 				vertexData.insert(vertexData.end(), {
@@ -344,7 +409,8 @@ void render() {
 	glDisableVertexAttribArray(program->positionAttribute);
 	glDisableVertexAttribArray(program->texCoordAttribute);
 
-	
+
+
 }
 
 
@@ -371,7 +437,8 @@ bool readLayerData(std::ifstream &stream)
 						Tile* newTile = new Tile(x*TILE_SIZE, y*TILE_SIZE, false, TILE_SIZE / 2, TILE_SIZE / 2);
 						//os << val << endl;
 						newTile->value = val;
-						if (val == 124 || val == 123 || val == 122 || val == 151 || val == 152 || val == 153)
+						if (val == 124 || val == 64 || val == 96 || val == 97 || val == 512 || val == 487 || val == 484
+						|| val == 488 || val == 516 || val == 518 || val == 586 || val == 557 || val == 159)
 						{
 							//cout << val << "solid" << endl;
 							newTile->isSolid = true;
@@ -460,12 +527,6 @@ void read() {
 
 
 
-void worldToTileCoordinates(float worldX, float worldY, int *gridX, int *gridY)
-{
-	*gridX = (int)(worldX / TILE_SIZE);
-	*gridY = (int)(-worldY / TILE_SIZE);
-	
-}
 template<class H>
 void clearTheHeap(vector<H*>& vec)
 {
@@ -527,7 +588,7 @@ int main(int argc, char *argv[])
 
 
 	//===============================================================================================================================================
-	Entity alien(placeX, placeY, sheet, TILE_SIZE/2, .25, .25, .25, -.25, 0, 0.0f);
+	Entity alien(placeX, placeY, sheet, TILE_SIZE/2, .25, .25, .25, -.25, 0, 0.0f,true);
 	TileMap tileMap(-alien.xPos, -alien.yPos);
 	//===============================================================================================================================================
 
@@ -556,77 +617,77 @@ int main(int argc, char *argv[])
 		render();
 		alien.DrawSpriteSheetSprite(program, 21, 30, 30, placeX, placeY);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+		alien.collide();
 		
 		
 		if (keys[SDL_SCANCODE_RIGHT])
 		{
 			
+			float penetration;
+
+			if (!alien.collidedRight)
+				alien.setPlayer(speed, 0);
+
+			else {
+				penetration = fabs(alien.gridx * TILE_SIZE - alien.xPos);
+				alien.setPlayer(-penetration + 0.0001, 0);
+				cout << alien.gridx << endl;
+
+			}
 			
-			//alien.movePlayer(elapsed);
-			alien.setPlayer(speed, 0);
 			
 		}	
 		if (keys[SDL_SCANCODE_LEFT] && alien.xPos > alien.xLimitLeft)
 		{
-			//alien.movePlayer(elapsed);
-			alien.setPlayer(-speed, 0);
+			float penetration;
+			if (!alien.collidedLeft)
+				alien.setPlayer(-speed, 0);
 
+			else {
+				penetration = fabs(alien.gridx * TILE_SIZE - alien.xPos + TILE_SIZE);
+				alien.setPlayer( penetration + 0.0001, 0);
+				cout << alien.gridx << endl;
+
+			}
 		}
 		if (keys[SDL_SCANCODE_UP])
 		{
-			//alien.movePlayer(elapsed);
+			float penetration; 
 
-			
-			alien.setPlayer(0, speed);
+			if (!alien.collidedTop)
+				alien.setPlayer(0, speed + .01);
+		
+			else {
+				penetration = fabs(alien.gridy * TILE_SIZE + alien.yPos - TILE_SIZE);
+				alien.setPlayer(0, -penetration + 0.0001);
+				cout << alien.gridy << endl;
+
+			}
+
 
 		}
 		if (keys[SDL_SCANCODE_DOWN])
 		{
+			//alien.collidedBottom = false;
+			float penetration;
 
-			ofstream os;
-			os.open("solids.txt");
-			os << "-------------------------------------------------" << endl;
-			for (int i = 0; i < allOfTheTiles.size(); i++) {
-				//os << allOfTheTiles[i]->solidint << endl;
-				//os << allOfTheTiles[i]->value << endl;
+			if (!alien.collidedBottom)
+			{
+				alien.setPlayer(0, -speed + .001);
 			}
-			os << "----------------------------------------------" << endl;
-			for (int i = 0; i < allOfTheTiles.size(); i++) {
-				//cout << allOfTheTiles[i]->yPos << endl;
-				if (-alien.yPos + TILE_SIZE/2 <= allOfTheTiles[i]->yPos + TILE_SIZE/2 && -alien.yPos + TILE_SIZE/2 >= allOfTheTiles[i]->yPos - TILE_SIZE/2)
-				{
-					//cout << "collide y" << endl;
-					//cout << allOfTheTiles[i]->xPos + TILE_SIZE / 2 << " v " <<  allOfTheTiles[i]->xPos - TILE_SIZE / 2 << endl;
-					if (alien.xPos <= allOfTheTiles[i]->xPos + TILE_SIZE / 2 && alien.xPos >= allOfTheTiles[i]->xPos - TILE_SIZE / 2)
-					{
-						os << "collide x" << endl;
-						os << allOfTheTiles[i]->solidint << endl;
-						os << allOfTheTiles[i]->value << endl;
-						if (allOfTheTiles[i]->solidint == 1)
-							cout << "is solid" << endl;
-					}
+			else {
+				penetration = fabs(alien.gridy * TILE_SIZE + alien.yPos + TILE_SIZE);
+				alien.setPlayer(0, penetration + 0.0001);
+				cout << alien.gridy << endl;
 
-				}
 			}
-			//alien.movePlayer(elapsed);
-			alien.setPlayer(0, -speed);
-			//cout << alien.yPos << endl;
-			//cout << alien.xPos << endl;
-		}
+			
 		
+		}
+		if (!alien.collidedBottom)
+		{
+			//alien.setPlayer(0, -speed/2);
+		}
 
 
 		viewMatrix.identity();
@@ -635,7 +696,6 @@ int main(int argc, char *argv[])
 		SDL_GL_SwapWindow(displayWindow);
 
 	}
-	//os.close();
 	delete program;
 	delete levelData;
 	clearTheHeap(allOfTheTiles);

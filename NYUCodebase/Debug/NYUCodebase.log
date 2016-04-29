@@ -1,9 +1,13 @@
-﻿Build started 4/25/2016 1:30:04 PM.
-     1>Project "C:\Users\Kevin\Downloads\platformer-master\NYUCodebase\NYUCodebase.vcxproj" on node 2 (Build target(s)).
+﻿Build started 4/28/2016 10:54:52 PM.
+     1>Project "C:\Users\Kevin\Downloads\FinalProject\NYUCodebase\NYUCodebase.vcxproj" on node 2 (Build target(s)).
      1>Link:
-         NYUCodebase.vcxproj -> C:\Users\Kevin\Downloads\platformer-master\Debug\NYUCodebase.exe
-     1>Done Building Project "C:\Users\Kevin\Downloads\platformer-master\NYUCodebase\NYUCodebase.vcxproj" (Build target(s)).
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"C:\Users\Kevin\Downloads\FinalProject\Debug\NYUCodebase.exe" /INCREMENTAL /NOLOGO /LIBPATH:C:\SDL2_mixer\lib\x86 /LIBPATH:C:\SDL2\lib\x86 /LIBPATH:C:\SDL2_image\lib\x86 /LIBPATH:C:\glew\lib\Release\Win32 /LIBPATH:C:\SDL2_mixer\lib\x86 SDL2.lib SDL2_mixer.lib glew32.lib SDL2main.lib SDL2_image.lib OpenGL32.lib SDL2_mixer.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:\Users\Kevin\Downloads\FinalProject\Debug\NYUCodebase.pdb" /SUBSYSTEM:WINDOWS /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:\Users\Kevin\Downloads\FinalProject\Debug\NYUCodebase.lib" /MACHINE:X86 Debug\Matrix.obj
+         Debug\platformer.obj
+         Debug\processData.obj
+         Debug\ShaderProgram.obj
+         NYUCodebase.vcxproj -> C:\Users\Kevin\Downloads\FinalProject\Debug\NYUCodebase.exe
+     1>Done Building Project "C:\Users\Kevin\Downloads\FinalProject\NYUCodebase\NYUCodebase.vcxproj" (Build target(s)).
 
 Build succeeded.
 
-Time Elapsed 00:00:00.13
+Time Elapsed 00:00:00.52
