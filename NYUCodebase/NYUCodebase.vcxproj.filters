@@ -27,6 +27,12 @@
     <ClCompile Include="processData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ClassDefGame.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="backup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Matrix.h">
@@ -37,6 +43,9 @@
     </ClInclude>
     <ClInclude Include="processData.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ClassDefGame.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

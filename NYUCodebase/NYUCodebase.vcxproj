@@ -74,12 +74,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="backup.cpp" />
+    <ClCompile Include="ClassDefGame.cpp" />
     <ClCompile Include="Matrix.cpp" />
     <ClCompile Include="platformer.cpp" />
     <ClCompile Include="processData.cpp" />
     <ClCompile Include="ShaderProgram.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ClassDefGame.h" />
     <ClInclude Include="Matrix.h" />
     <ClInclude Include="processData.h" />
     <ClInclude Include="ShaderProgram.h" />

@@ -47,7 +47,25 @@ bool isSolid(int ind) {
 	//|| val == 488 || val == 516 || val == 518 || val == 586 || val == 557 || val == 159
 	if (ind == 123)
 		return true;
+	if (ind == 152)
+		return true;
+	if (ind == 68)
+		return true;
+	if (ind == 483)
+		return true;
+	if (ind == 98)
+		return true;
+	if (ind == 556)
+		return true;
+	if (ind == 563)
+		return true;
 	if (ind == 158)
+		return true;
+	if (ind == 63)
+		return true;
+	if (ind == 92)
+		return true;
+	if (ind == 332)
 		return true;
 
 
@@ -89,6 +107,7 @@ ShaderProgram *program;
 std::vector<Tile*> allOfTheTiles;
 const Uint8 *keys = SDL_GetKeyboardState(NULL);
 GLuint sheet;
+GLuint sheet_rgba;
 int firstFrame = 0;
 float placeX;
 float placeY;
@@ -118,8 +137,8 @@ public:
 	float velocity_y;
 	float acceleration_x;
 	float acceleration_y;
-	float friction_x;
-	float friction_y = 0.1;
+	float friction_x = 1.1;
+	float friction_y = 2.5;
 	bool collidedTop = false;
 	bool collidedBottom = false;
 	bool collidedLeft = false;
@@ -144,17 +163,21 @@ public:
 
 	}
 	void collide() {
-		cout << gridx << gridy << endl;
 		worldToTileCoordinates(xPos, yPos - TILE_SIZE/2 , &gridx, &gridy);
 		if (isSolid(levelData[gridy][gridx])){
 			collidedBottom = true;
+			velocity_y = 0;
+			acceleration_y = 0;
 		}
 		else {
 			collidedBottom = false;
+			acceleration_y = 9.81;
 		}
 		worldToTileCoordinates(xPos, yPos + TILE_SIZE / 2, &gridx, &gridy);
 		if (isSolid(levelData[gridy][gridx])){
 			collidedTop = true;
+			velocity_y = 0;
+			acceleration_y = 9.81;
 		}
 		else {
 			collidedTop = false;
@@ -162,6 +185,9 @@ public:
 		worldToTileCoordinates(xPos + TILE_SIZE / 2, yPos, &gridx, &gridy);
 		if (isSolid(levelData[gridy][gridx])){
 			collidedRight = true;
+			velocity_x = 0;
+			acceleration_x = 0;
+
 		}
 		else {
 			collidedRight = false;
@@ -169,6 +195,8 @@ public:
 		worldToTileCoordinates(xPos - TILE_SIZE / 2, yPos, &gridx, &gridy);
 		if (isSolid(levelData[gridy][gridx])){
 			collidedLeft = true;
+			velocity_x = 0;
+			acceleration_x = 0;
 		}
 		else {
 			collidedLeft = false;
@@ -176,22 +204,27 @@ public:
 	}
 	void movePlayer(float elapsed)
 	{
-
-		cout << velocity_y<< endl;
-		//velocity_x = lerp(velocity_x, 0.0f, FIXED_TIMESTEP * friction_x);
-		velocity_y = lerp(velocity_y, 0.0f, FIXED_TIMESTEP * friction_y);
-		//velocity_y = -1;
-		cout << velocity_y << endl;
-		//velocity_x += acceleration_x * FIXED_TIMESTEP;
-		velocity_y += acceleration_y * FIXED_TIMESTEP;
-		//xPos += velocity_x * FIXED_TIMESTEP;
-		yPos += velocity_y * FIXED_TIMESTEP;
-
-	
+		if (velocity_x > 2 || velocity_x < -2){
+			acceleration_x = 0;
+		}
 		
+		if (velocity_y > 2 || velocity_y < -2){
+			acceleration_y = 0;
+		}
 		
+
+		velocity_x = lerp(velocity_x, 0.0f, elapsed * friction_x);
+		velocity_y = lerp(velocity_y, 0.0f, elapsed * friction_y);
+		
+		velocity_x += acceleration_x * elapsed;
+		velocity_y += acceleration_y * elapsed;
+		xPos += velocity_x * elapsed;
+		yPos -= velocity_y * elapsed;
+
+		
+
 		modelMatrix.identity();
-		modelMatrix.Translate(0, yPos, 0);
+		modelMatrix.Translate(xPos, yPos, 0);
 		program->setModelMatrix(modelMatrix);
 
 	}
@@ -227,7 +260,10 @@ void Entity::DrawSpriteSheetSprite(ShaderProgram *program, int index, int sprite
 	modelMatrix.identity();
 	modelMatrix.Translate(xPos, yPos, 0);
 	glUseProgram(program->programID);
-	glBindTexture(GL_TEXTURE_2D, sheet);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	//glClearColor(0.0, 0.0, 0.0, 0.0);
+	glBindTexture(GL_TEXTURE_2D, sheet_rgba);
 	glVertexAttribPointer(program->positionAttribute, 2, GL_FLOAT, false, 0, vertices);
 	glEnableVertexAttribArray(program->positionAttribute);
 	glVertexAttribPointer(program->texCoordAttribute, 2, GL_FLOAT, false, 0, texCoords);
@@ -235,6 +271,7 @@ void Entity::DrawSpriteSheetSprite(ShaderProgram *program, int index, int sprite
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	glDisableVertexAttribArray(program->positionAttribute);
 	glDisableVertexAttribArray(program->texCoordAttribute);
+	//glBlendFunc(GL_ONE, GL_ZERO);
 }
 
 
@@ -278,6 +315,7 @@ class SheetSprite
 };
 
 void SheetSprite::Draw(ShaderProgram* program) {
+	
 		glBindTexture(GL_TEXTURE_2D, textureID);
 		GLfloat texCoords[] = {
 			u, v + height,
@@ -295,7 +333,7 @@ void SheetSprite::Draw(ShaderProgram* program) {
 			(0.5f)* size * aspect, 0.5f * size,
 			(-0.5f) * size * aspect, -0.5f * size,
 			(0.5f)* size * aspect, -0.5f * size };
-		// draw our arrays
+		
 		glUseProgram(program->programID);
 		glBindTexture(GL_TEXTURE_2D, textureID);
 		glVertexAttribPointer(program->positionAttribute, 2, GL_FLOAT, false, 0, vertices);
@@ -327,6 +365,20 @@ GLuint LoadTexture(const char *image_path) {
 	SDL_FreeSurface(surface);
 	return textureID;
 }
+
+GLuint LoadTextureRGBA(const char *image_path) {
+	SDL_Surface *surface = IMG_Load(image_path);
+	GLuint textureID;
+	glGenTextures(1, &textureID);
+	glBindTexture(GL_TEXTURE_2D, textureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, surface->w, surface->h, 0, GL_RGBA,
+		GL_UNSIGNED_BYTE, surface->pixels);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	SDL_FreeSurface(surface);
+	return textureID;
+}
+
 
 
 bool readHeader(std::ifstream &stream) {
@@ -364,16 +416,17 @@ void render() {
 	std::vector<float> vertexData;
 	std::vector<float> texCoordData;
 
-	float marigin = 2 / 21;
+	float marigin = 2.0f / 629.0f;
 
 	for (int y = 0; y < LEVEL_HEIGHT; y++) {
 		for (int x = 0; x < LEVEL_WIDTH; x++) {
 			if (levelData[y][x] != 0)
 			{
-				float u = (float)(((int)levelData[y][x]) % SPRITE_COUNT_X) / (float)SPRITE_COUNT_X + marigin;
-				float v = (float)(((int)levelData[y][x]) / SPRITE_COUNT_X) / (float)SPRITE_COUNT_Y + marigin;
-				float spriteWidth = 1.0f / (float)SPRITE_COUNT_X;
-				float spriteHeight = 1.0f / (float)SPRITE_COUNT_Y;
+				
+				float u = ((float)(((int)levelData[y][x]) % SPRITE_COUNT_X) / (float)SPRITE_COUNT_X) + marigin;
+				float v = ((float)(((int)levelData[y][x]) / SPRITE_COUNT_X) / (float)SPRITE_COUNT_Y) + marigin;
+				float spriteWidth = (1.0f / (float)SPRITE_COUNT_X) - 2 * marigin;
+				float spriteHeight = (1.0f / (float)SPRITE_COUNT_Y) - 2 * marigin;
 				vertexData.insert(vertexData.end(), {
 					TILE_SIZE * x, -TILE_SIZE * y,
 					TILE_SIZE * x, (-TILE_SIZE * y) - TILE_SIZE,
@@ -394,9 +447,12 @@ void render() {
 
 		}
 	}
+	//forworld
 	program->setModelMatrix(modelMatrixForWorld);
 	program->setViewMatrix(viewMatrix);
 	program->setProjectionMatrix(projectionMatrix);
+
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	
 	glUseProgram(program->programID);
@@ -440,22 +496,18 @@ bool readLayerData(std::ifstream &stream)
 						if (val == 124 || val == 64 || val == 96 || val == 97 || val == 512 || val == 487 || val == 484
 						|| val == 488 || val == 516 || val == 518 || val == 586 || val == 557 || val == 159)
 						{
-							//cout << val << "solid" << endl;
 							newTile->isSolid = true;
 							
 							newTile->solidint = 1;
-							//cout << newTile->isSolid << endl;
 						}
 						else {
 							newTile->solidint = 5;
 						}
-						//cout << newTile->xPos << endl;
 						// be careful, the tiles in this format are indexed from 1 not 0
 						levelData[y][x] = val - 1; 
 						allOfTheTiles.push_back(newTile);
 						
-						//os << levelData[y][x] << endl;
-						//cout << x << "           " << y << endl;
+
 					}
 				
 					else {
@@ -501,7 +553,6 @@ void read() {
 	}
 	else
 	{
-		//cout << "SUCCESS!!!" << endl;
 		while (getline(infile, line))
 		{
 			if (line == "[header]")
@@ -540,6 +591,8 @@ void clearTheHeap(vector<H*>& vec)
 
 
 
+
+
 int main(int argc, char *argv[])
 {
 
@@ -571,6 +624,7 @@ int main(int argc, char *argv[])
 
 
 	//=============================================================================================================================================
+	//forworld
 	program->setModelMatrix(modelMatrixForWorld);
 	program->setProjectionMatrix(projectionMatrix);
 	program->setViewMatrix(viewMatrix);
@@ -580,6 +634,7 @@ int main(int argc, char *argv[])
 	bool done = false;
 	read();
 	sheet = LoadTexture("spritesheet.png");
+	sheet_rgba = LoadTextureRGBA("spritesheet_rgba.png");
 	float lastFrameTicks = 0.0f;
 	float ticks;
 	float elapsed;
@@ -597,6 +652,9 @@ int main(int argc, char *argv[])
 	//to position the alien at the beginning of the level
 	alien.setPlayer(5.4f, -6.6f);
 	alien.xLimitLeft = alien.xPos;
+	alien.xLimitRight = 114;
+	alien.acceleration_x = 0;
+	alien.acceleration_y = 0;
 
 
 	int * x = nullptr;
@@ -614,88 +672,117 @@ int main(int argc, char *argv[])
 				speed = 1.5 * elapsed;
 	
 		glClear(GL_COLOR_BUFFER_BIT);
-		render();
-		alien.DrawSpriteSheetSprite(program, 21, 30, 30, placeX, placeY);
+		//render();
+		
 
 		alien.collide();
 		
 		
-		if (keys[SDL_SCANCODE_RIGHT])
+		if (keys[SDL_SCANCODE_RIGHT] && alien.gridx < alien.xLimitRight)
 		{
 			
 			float penetration;
-
-			if (!alien.collidedRight)
-				alien.setPlayer(speed, 0);
+			if (!alien.collidedRight){
+				
+				//alien.setPlayer(speed, 0);
+				alien.acceleration_x = 10;
+			
+			}
 
 			else {
-				penetration = fabs(alien.gridx * TILE_SIZE - alien.xPos);
+				alien.velocity_x = 0;
+				penetration = fabs(alien.gridx * TILE_SIZE - (alien.xPos - TILE_SIZE / 2));
 				alien.setPlayer(-penetration + 0.0001, 0);
-				cout << alien.gridx << endl;
+			
 
 			}
 			
 			
 		}	
-		if (keys[SDL_SCANCODE_LEFT] && alien.xPos > alien.xLimitLeft)
+		else if (keys[SDL_SCANCODE_LEFT] && alien.xPos > alien.xLimitLeft)
 		{
 			float penetration;
-			if (!alien.collidedLeft)
-				alien.setPlayer(-speed, 0);
-
+			if (!alien.collidedLeft){
+				alien.acceleration_x = -10;
+			}
 			else {
-				penetration = fabs(alien.gridx * TILE_SIZE - alien.xPos + TILE_SIZE);
-				alien.setPlayer( penetration + 0.0001, 0);
-				cout << alien.gridx << endl;
-
+				alien.velocity_x = 0;
+				penetration = fabs(alien.gridx * TILE_SIZE - (alien.xPos - TILE_SIZE * 3/2));
+				alien.setPlayer( penetration - 0.0001, 0);
 			}
 		}
-		if (keys[SDL_SCANCODE_UP])
+		else if (keys[SDL_SCANCODE_UP])
 		{
 			float penetration; 
 
-			if (!alien.collidedTop)
-				alien.setPlayer(0, speed + .01);
-		
+			if (!alien.collidedTop){
+				//alien.setPlayer(0, speed + .01);
+				alien.acceleration_y = -9.81;
+			}
 			else {
-				penetration = fabs(alien.gridy * TILE_SIZE + alien.yPos - TILE_SIZE);
+				penetration = fabs(alien.gridy * TILE_SIZE + (alien.yPos + TILE_SIZE/2 ));
 				alien.setPlayer(0, -penetration + 0.0001);
-				cout << alien.gridy << endl;
-
 			}
 
 
 		}
-		if (keys[SDL_SCANCODE_DOWN])
+		else if (keys[SDL_SCANCODE_DOWN])
 		{
-			//alien.collidedBottom = false;
+
 			float penetration;
 
 			if (!alien.collidedBottom)
 			{
-				alien.setPlayer(0, -speed + .001);
+				alien.acceleration_y = 9.81;
 			}
 			else {
-				penetration = fabs(alien.gridy * TILE_SIZE + alien.yPos + TILE_SIZE);
-				alien.setPlayer(0, penetration + 0.0001);
-				cout << alien.gridy << endl;
-
+				penetration = fabs(alien.gridy * TILE_SIZE + (alien.yPos + TILE_SIZE/2));
+				alien.setPlayer(0, penetration - 0.001);
 			}
 			
 		
 		}
-		if (!alien.collidedBottom)
-		{
-			//alien.setPlayer(0, -speed/2);
+		else {
+			alien.acceleration_x = 0;
+
+
 		}
 
 
+		if (!alien.collidedBottom)
+		{
+			alien.acceleration_y -= 6.81;
+		}
+		else {
+			float penetration = fabs(alien.gridy * TILE_SIZE + (alien.yPos + TILE_SIZE / 2));
+			alien.setPlayer(0, penetration - 0.001);
+		}
+
+
+		render();
+	
+		float fixedElapsed = elapsed;
+		if (fixedElapsed > FIXED_TIMESTEP * MAX_TIMESTEPS) {
+			fixedElapsed = FIXED_TIMESTEP * MAX_TIMESTEPS;
+		}
+		while (fixedElapsed >= FIXED_TIMESTEP) {
+			fixedElapsed -= FIXED_TIMESTEP;
+			alien.movePlayer(FIXED_TIMESTEP);
+		}
+		alien.movePlayer(fixedElapsed);
+
+		alien.DrawSpriteSheetSprite(program, 21, 30, 30, placeX, placeY);
+		
 		viewMatrix.identity();
 		viewMatrix.Translate(-alien.xPos, -alien.yPos, 0);
 	
 		SDL_GL_SwapWindow(displayWindow);
 
 	}
+
+	
+
+
 	delete program;
 	delete levelData;
 	clearTheHeap(allOfTheTiles);
