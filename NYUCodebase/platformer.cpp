@@ -20,6 +20,7 @@
 #include <sstream>
 
 
+
 #ifdef _WINDOWS
 #define RESOURCE_FOLDER ""
 #else
@@ -33,6 +34,34 @@
 #define LEVEL_WIDTH 128
 #define FIXED_TIMESTEP 0.0166666f
 #define MAX_TIMESTEPS 6
+
+
+SDL_Window* displayWindow;
+unsigned int ** levelData;
+int mapWidth;
+int mapHeight;
+Matrix modelMatrixForWorld;
+Matrix modelMatrix;
+Matrix modelMatrixEnemy;
+Matrix modelMatrixStart;
+Matrix projectionMatrix;
+Matrix viewMatrix;
+ShaderProgram *program;
+
+
+const Uint8 *keys = SDL_GetKeyboardState(NULL);
+GLuint sheet;
+GLuint sheet_rgba;
+int firstFrame = 0;
+float placeX;
+float placeY;
+float speed;
+
+
+int gameState;
+
+using namespace std;
+
 
 
 void worldToTileCoordinates(float worldX, float worldY, int *gridX, int *gridY)
@@ -67,12 +96,82 @@ bool isSolid(int ind) {
 		return true;
 	if (ind == 332)
 		return true;
-
+	if (ind == 497)
+		return true;
+	if (ind == 557)
+		return true;
+	if (ind == 592)
+		return true;
+	if (ind == 218)
+		return true;
+	if (ind == 183)
+		return true;
+	if (ind == 585)
+		return true;
+	if (ind == 529)
+		return true;
 
 
 	return false;
 
 
+}
+
+
+bool atEnd(int ind){
+	if (ind == 313)
+		return true;
+	return false;
+
+
+}
+
+bool isDead(int ind) {
+	if (ind == 574)
+		return true;
+	if (ind == 578)
+		return true;
+	if (ind == 11)
+		return true;
+
+	return false;
+
+}
+
+
+void DrawText(ShaderProgram *program, int fontTexture, std::string text, float size, float spacing) {
+	float texture_size = 1.0 / 16.0f;
+	std::vector<float> vertexData;
+	std::vector<float> texCoordData;
+	for (int i = 0; i < text.size(); i++) {
+		float texture_x = (float)(((int)text[i]) % 16) / 16.0f;
+		float texture_y = (float)(((int)text[i]) / 16) / 16.0f;
+		vertexData.insert(vertexData.end(), {
+			((size + spacing) * i) + (-0.5f * size), 0.5f * size,
+			((size + spacing) * i) + (-0.5f * size), -0.5f * size,
+			((size + spacing) * i) + (0.5f * size), 0.5f * size,
+			((size + spacing) * i) + (0.5f * size), -0.5f * size,
+			((size + spacing) * i) + (0.5f * size), 0.5f * size,
+			((size + spacing) * i) + (-0.5f * size), -0.5f * size,
+		});
+		texCoordData.insert(texCoordData.end(), {
+			texture_x, texture_y,
+			texture_x, texture_y + texture_size,
+			texture_x + texture_size, texture_y,
+			texture_x + texture_size, texture_y + texture_size,
+			texture_x + texture_size, texture_y,
+			texture_x, texture_y + texture_size,
+		});
+	}
+	glUseProgram(program->programID);
+	glVertexAttribPointer(program->positionAttribute, 2, GL_FLOAT, false, 0, vertexData.data());
+	glEnableVertexAttribArray(program->positionAttribute);
+	glVertexAttribPointer(program->texCoordAttribute, 2, GL_FLOAT, false, 0, texCoordData.data());
+	glEnableVertexAttribArray(program->texCoordAttribute);
+	glBindTexture(GL_TEXTURE_2D, fontTexture);
+	glDrawArrays(GL_TRIANGLES, 0, text.size() * 6);
+	glDisableVertexAttribArray(program->positionAttribute);
+	glDisableVertexAttribArray(program->texCoordAttribute);
 }
 
 
@@ -94,26 +193,8 @@ public:
 	}
 };
 
-SDL_Window* displayWindow;
-unsigned int ** levelData;
-int mapWidth;
-int mapHeight;
-Matrix modelMatrixForWorld;
-Matrix modelMatrix;
-Matrix projectionMatrix;
-Matrix viewMatrix;
-ShaderProgram *program;
-
 std::vector<Tile*> allOfTheTiles;
-const Uint8 *keys = SDL_GetKeyboardState(NULL);
-GLuint sheet;
-GLuint sheet_rgba;
-int firstFrame = 0;
-float placeX;
-float placeY;
-float speed;
 
-using namespace std;
 
 
 float lerp(float v0, float v1, float t) {
@@ -143,7 +224,10 @@ public:
 	bool collidedBottom = false;
 	bool collidedLeft = false;
 	bool collidedRight = false;
-
+	bool isAtEnd = false;
+	bool goingRight = true;
+	bool isAlive = true;
+	string state;
 
 	Entity(float x, float y, int texture, float width, float velX, float velY, float accelX, float accelY, float fricX, float fricY, bool collide) : xPos(x), yPos(y), textureID(texture),
 		acceleration_x(accelX), acceleration_y(accelY), velocity_x(velX), velocity_y(velY), collidedBottom(collide)
@@ -151,21 +235,22 @@ public:
 
 	}
 	void DrawSpriteSheetSprite(ShaderProgram *program, int index, int spriteCountX,
-		int spriteCountY, int posX, int posY);
-	void setPlayer(float x, float y)
+		int spriteCountY, int posX, int posY, Matrix modelM);
+	void setPlayer(float x, float y, Matrix modelM)
 	{
 		
 		xPos += x;
 		yPos += y;
-		modelMatrix.identity();
-		modelMatrix.Translate(xPos, yPos, 0);
-		program->setModelMatrix(modelMatrix);
+		modelM.identity();
+		modelM.Translate(xPos, yPos, 0);
+		program->setModelMatrix(modelM);
 
 	}
 	void collide() {
 		worldToTileCoordinates(xPos, yPos - TILE_SIZE/2 , &gridx, &gridy);
 		if (isSolid(levelData[gridy][gridx])){
 			collidedBottom = true;
+			
 			velocity_y = 0;
 			acceleration_y = 0;
 		}
@@ -176,6 +261,7 @@ public:
 		worldToTileCoordinates(xPos, yPos + TILE_SIZE / 2, &gridx, &gridy);
 		if (isSolid(levelData[gridy][gridx])){
 			collidedTop = true;
+			
 			velocity_y = 0;
 			acceleration_y = 9.81;
 		}
@@ -184,9 +270,14 @@ public:
 		}
 		worldToTileCoordinates(xPos + TILE_SIZE / 2, yPos, &gridx, &gridy);
 		if (isSolid(levelData[gridy][gridx])){
+			
 			collidedRight = true;
 			velocity_x = 0;
 			acceleration_x = 0;
+
+		}
+		else if (atEnd(levelData[gridy][gridx])){
+			isAtEnd = true;
 
 		}
 		else {
@@ -194,6 +285,7 @@ public:
 		}
 		worldToTileCoordinates(xPos - TILE_SIZE / 2, yPos, &gridx, &gridy);
 		if (isSolid(levelData[gridy][gridx])){
+			
 			collidedLeft = true;
 			velocity_x = 0;
 			acceleration_x = 0;
@@ -202,9 +294,52 @@ public:
 			collidedLeft = false;
 		}
 	}
+
+	void moveEnemy(float elapsed) {
+		if (state == "Patrol"){
+			if (xPos < xLimitRight && goingRight){
+				acceleration_x = 5;
+			}
+			else if (!goingRight && xPos < xLimitLeft){
+				acceleration_x = 5;
+				goingRight = true;
+			}
+
+			else {
+				acceleration_x = -5;
+				goingRight = false;
+			}
+		}
+		else if (state == "ChasingLeft" && xPos > xLimitLeft){
+			acceleration_x = -5;
+
+		}
+		else if (state == "ChasingRight" && xPos < xLimitRight) {
+			acceleration_x = 5;
+		}
+		else{
+			acceleration_x = 0;
+		}
+		velocity_x = lerp(velocity_x, 0.0f, elapsed * 1.1);
+		velocity_y = lerp(velocity_y, 0.0f, elapsed * friction_y);
+
+		velocity_x += acceleration_x * elapsed;
+		velocity_y += acceleration_y * elapsed;
+		xPos += velocity_x * elapsed;
+		yPos -= velocity_y * elapsed;
+
+
+
+		modelMatrixEnemy.identity();
+		modelMatrixEnemy.Translate(xPos, yPos, 0);
+		program->setModelMatrix(modelMatrixEnemy);
+
+	}
+
+
 	void movePlayer(float elapsed)
 	{
-		if (velocity_x > 2 || velocity_x < -2){
+		if (velocity_x > 9 || velocity_x < -9){
 			acceleration_x = 0;
 		}
 		
@@ -215,26 +350,145 @@ public:
 
 		velocity_x = lerp(velocity_x, 0.0f, elapsed * friction_x);
 		velocity_y = lerp(velocity_y, 0.0f, elapsed * friction_y);
-		
+
 		velocity_x += acceleration_x * elapsed;
 		velocity_y += acceleration_y * elapsed;
 		xPos += velocity_x * elapsed;
 		yPos -= velocity_y * elapsed;
 
-		
+	
 
 		modelMatrix.identity();
 		modelMatrix.Translate(xPos, yPos, 0);
+		if (acceleration_x < 0)
+			modelMatrix.Scale(-1, 1, 0);
 		program->setModelMatrix(modelMatrix);
 
 	}
+
+	void isPlayerDead() {
+		if (isDead(levelData[gridy][gridx])){
+			isAlive = false;
+		
+		}
+		else {
+			isAlive = true;;
+		}
+
+
+	}
 	
+	
+	void checkMovement(){
+
+		if (keys[SDL_SCANCODE_RIGHT] && gridx < xLimitRight)
+		{
+
+			float penetration;
+			if (!collidedRight){
+
+				//alien.setPlayer(speed, 0);
+				acceleration_x = 10;
+
+			}
+
+			else {
+				velocity_x = 0;
+				penetration = fabs(gridx * TILE_SIZE - (xPos - TILE_SIZE / 2));
+				setPlayer(-penetration + 0.0001, 0, modelMatrix);
+
+
+			}
+
+
+		}
+		else if (keys[SDL_SCANCODE_LEFT] && xPos > xLimitLeft)
+		{
+			float penetration;
+			if (!collidedLeft){
+				acceleration_x = -10;
+			}
+			else {
+				velocity_x = 0;
+				penetration = fabs(gridx * TILE_SIZE - (xPos - TILE_SIZE * 3 / 2));
+				setPlayer(penetration - 0.0001, 0, modelMatrix);
+			}
+		}
+		else {
+			acceleration_x = 0;
+
+
+		}
+
+		if (keys[SDL_SCANCODE_UP] && collidedBottom)
+		{
+			float penetration;
+			//Mix_PlayChannel(-1, deathSound, 0);
+			if (!collidedTop){
+				
+				acceleration_y = -50.81;
+			}
+			else {
+				penetration = fabs(gridy * TILE_SIZE + (yPos + TILE_SIZE / 2));
+				setPlayer(0, -penetration + 0.0001, modelMatrix);
+			}
+
+
+		}
+		else if (keys[SDL_SCANCODE_DOWN])
+		{
+
+			float penetration;
+
+			if (!collidedBottom)
+			{
+				acceleration_y = 9.81;
+			}
+			else {
+				penetration = fabs(gridy * TILE_SIZE + (yPos + TILE_SIZE / 2));
+				setPlayer(0, penetration - 0.001, modelMatrix);
+			}
+
+
+		}
+
+
+
+		if (!collidedBottom)
+		{
+			acceleration_y -= 6.81;
+		}
+		else {
+			float penetration = fabs(gridy * TILE_SIZE + (yPos + TILE_SIZE / 2));
+			setPlayer(0, penetration - 0.001, modelMatrix);
+		}
+
+	}
+
+	void seePlayer (Entity& player){
+		
+		if (fabs(player.yPos - yPos) < .25f && fabs(player.xPos - (xPos + 40)) < 3){
+			if (player.xPos - (xPos + 40) <  0) {
+				state = "ChasingLeft";
+			}
+			else if (player.xPos - (xPos + 40) > 0) {
+				state = "ChasingRight";
+			}
+			if (fabs(player.xPos - (xPos + 40)) < 0.25){
+				player.isAlive = false;
+				cout << "ur mum" << endl;
+			}
+		}
+		else {
+			state = "Patrol";
+		}
+	}
 
 	
 };
 
 void Entity::DrawSpriteSheetSprite(ShaderProgram *program, int index, int spriteCountX,
-	int spriteCountY, int posX, int posY)
+	int spriteCountY, int posX, int posY, Matrix modelM)
 {
 	/*posX *=TILE_SIZE;
 	posY *= TILE_SIZE;*/
@@ -256,9 +510,9 @@ void Entity::DrawSpriteSheetSprite(ShaderProgram *program, int index, int sprite
 		0.5f*TILE_SIZE, 0.5f*TILE_SIZE,
 		-0.5f*TILE_SIZE, -0.5f*TILE_SIZE,
 		0.5f*TILE_SIZE, -0.5f*TILE_SIZE };
-	program->setModelMatrix(modelMatrix);
-	modelMatrix.identity();
-	modelMatrix.Translate(xPos, yPos, 0);
+	program->setModelMatrix(modelM);
+	modelM.identity();
+	modelM.Translate(xPos, yPos, 0);
 	glUseProgram(program->programID);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -537,15 +791,15 @@ bool readEntityData(std::ifstream &stream) {
 			string xPosition, yPosition;
 			getline(lineStream, xPosition, ',');
 			getline(lineStream, yPosition, ',');
-			float placeX = atoi(xPosition.c_str()) / 30 * TILE_SIZE;
-			float placeY = atoi(yPosition.c_str()) / 30 * -TILE_SIZE;
-			//placeEntity(type, placeX, placeY);
+			float placeX = atoi(xPosition.c_str()) / 30.0f * TILE_SIZE;
+			float placeY = atoi(yPosition.c_str()) / 30.0f * -TILE_SIZE;
+			cout << "X:" << placeX << " Y: " << placeY  << endl;
 		}
 	}
 	return true;
 }
-void read() {
-	ifstream infile("world.txt");
+void read(string world) {
+	ifstream infile(world);
 	string line;
 	if (!infile)
 	{
@@ -569,6 +823,11 @@ void read() {
 			else if (line == "[Player]")
 			{
 				readEntityData(infile);
+				
+			}
+			else if (line == "[Enemies]"){
+				readEntityData(infile);
+
 			}
 		}
 	}
@@ -632,33 +891,47 @@ int main(int argc, char *argv[])
 
 	SDL_Event event;
 	bool done = false;
-	read();
+	string world1 = "world.txt";
+	string world2 = "secondWorld.txt";
+	read(world1);
 	sheet = LoadTexture("spritesheet.png");
 	sheet_rgba = LoadTextureRGBA("spritesheet_rgba.png");
+	GLuint fontTexture = LoadTextureRGBA("font2.png");
+	string welcome = "Press Space to start";
+	string death = "You died, press start to restart";
 	float lastFrameTicks = 0.0f;
 	float ticks;
 	float elapsed;
+	gameState = 0;
 
+	Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 4096);
+	Mix_Chunk *deathSound = Mix_LoadWAV("death.wav");
 
+	Mix_Music *music;
+	music = Mix_LoadMUS("BackgroundMusic.mp3");
 
-
+	Mix_PlayMusic(music, -1);
+	
 	//===============================================================================================================================================
-	Entity alien(placeX, placeY, sheet, TILE_SIZE/2, .25, .25, .25, -.25, 0, 0.0f,true);
+	Entity alien(placeX, placeY, sheet, TILE_SIZE/2, 0, 0, 0, 0, 0, 0.0f,true);
+	Entity enemy1(placeX, placeY, sheet, TILE_SIZE / 2, 0, 0, 0, 0, 0, 0.0f, true);
 	TileMap tileMap(-alien.xPos, -alien.yPos);
 	//===============================================================================================================================================
 
 
 
 	//to position the alien at the beginning of the level
-	alien.setPlayer(5.4f, -6.6f);
+	
+	alien.setPlayer(5.4f, -6.6f, modelMatrix);
+	enemy1.state = "Patrol";
 	alien.xLimitLeft = alien.xPos;
 	alien.xLimitRight = 114;
 	alien.acceleration_x = 0;
 	alien.acceleration_y = 0;
 
-
-	int * x = nullptr;
-	int *y= nullptr;
+	
+	//int * x = nullptr;
+	//int *y= nullptr;
 	while (!done) {
 		while (SDL_PollEvent(&event)) {
 			if (event.type == SDL_QUIT || event.type == SDL_WINDOWEVENT_CLOSE) {
@@ -666,122 +939,162 @@ int main(int argc, char *argv[])
 			}
 
 		}
-				ticks = (float)SDL_GetTicks() / 1000.0f;
-				elapsed = ticks - lastFrameTicks;
-				lastFrameTicks = ticks;
-				speed = 1.5 * elapsed;
-	
+		
+		ticks = (float)SDL_GetTicks() / 1000.0f;
+		elapsed = ticks - lastFrameTicks;
+		lastFrameTicks = ticks;
+		speed = 1.5 * elapsed;
+
 		glClear(GL_COLOR_BUFFER_BIT);
+
+		glDisable(GL_CULL_FACE);
 		//render();
-		
 
-		alien.collide();
-		
-		
-		if (keys[SDL_SCANCODE_RIGHT] && alien.gridx < alien.xLimitRight)
-		{
+
+		if (gameState == 0){
+
+			DrawText(program, fontTexture, welcome, 0.2f, 0.02f);
 			
-			float penetration;
-			if (!alien.collidedRight){
+			modelMatrix.identity();
+			modelMatrix.setPosition(-2.5, 1, 1);
+
+			program->setModelMatrix(modelMatrix);
+			program->setProjectionMatrix(projectionMatrix);
+			program->setViewMatrix(viewMatrix);
+			if (keys[SDL_SCANCODE_SPACE]){
 				
-				//alien.setPlayer(speed, 0);
-				alien.acceleration_x = 10;
-			
-			}
-
-			else {
-				alien.velocity_x = 0;
-				penetration = fabs(alien.gridx * TILE_SIZE - (alien.xPos - TILE_SIZE / 2));
-				alien.setPlayer(-penetration + 0.0001, 0);
-			
+				gameState = 1;
 
 			}
-			
-			
-		}	
-		else if (keys[SDL_SCANCODE_LEFT] && alien.xPos > alien.xLimitLeft)
-		{
-			float penetration;
-			if (!alien.collidedLeft){
-				alien.acceleration_x = -10;
-			}
-			else {
-				alien.velocity_x = 0;
-				penetration = fabs(alien.gridx * TILE_SIZE - (alien.xPos - TILE_SIZE * 3/2));
-				alien.setPlayer( penetration - 0.0001, 0);
-			}
-		}
-		else if (keys[SDL_SCANCODE_UP])
-		{
-			float penetration; 
-
-			if (!alien.collidedTop){
-				//alien.setPlayer(0, speed + .01);
-				alien.acceleration_y = -9.81;
-			}
-			else {
-				penetration = fabs(alien.gridy * TILE_SIZE + (alien.yPos + TILE_SIZE/2 ));
-				alien.setPlayer(0, -penetration + 0.0001);
-			}
-
 
 		}
-		else if (keys[SDL_SCANCODE_DOWN])
-		{
+		else if (gameState == 1) {
+			
+			alien.collide();
+			alien.checkMovement();
+			alien.isPlayerDead();
 
-			float penetration;
+			if (alien.isAtEnd){
+				read(world2);
+				alien.isAtEnd = false;
+				alien.velocity_x = 0;
+				alien.velocity_y = 0;
+				alien.acceleration_x = 0;
+				alien.acceleration_y = 0;
+				//enemy1.DrawSpriteSheetSprite(program, 169, 30, 30, placeX, placeY, modelMatrixEnemy);
+				gameState = 2;
+				//enemy1.setPlayer(5.4f, -6.0f, modelMatrixEnemy);
+				modelMatrixEnemy.identity();
+				modelMatrixEnemy.Translate(40, -9.75, 0);
+				program->setModelMatrix(modelMatrixEnemy);
+			}
 
-			if (!alien.collidedBottom)
+			if (!alien.isAlive)
 			{
-				alien.acceleration_y = 9.81;
+				Mix_PlayChannel(-1, deathSound, 0);
+				gameState = 99;
+	
 			}
-			else {
-				penetration = fabs(alien.gridy * TILE_SIZE + (alien.yPos + TILE_SIZE/2));
-				alien.setPlayer(0, penetration - 0.001);
+
+			render();
+
+			float fixedElapsed = elapsed;
+			if (fixedElapsed > FIXED_TIMESTEP * MAX_TIMESTEPS) {
+				fixedElapsed = FIXED_TIMESTEP * MAX_TIMESTEPS;
 			}
+			while (fixedElapsed >= FIXED_TIMESTEP) {
+				fixedElapsed -= FIXED_TIMESTEP;
+				alien.movePlayer(FIXED_TIMESTEP);
+			}
+			alien.movePlayer(fixedElapsed);
+
+			alien.DrawSpriteSheetSprite(program, 21, 30, 30, placeX, placeY, modelMatrix);
 			
+
+			/*
+			modelMatrixEnemy.identity();
+			modelMatrixEnemy.setPosition(alien.xPos, alien.yPos, 0);
+			*/
+
+			
+			program->setModelMatrix(modelMatrixEnemy);
+
+			viewMatrix.identity();
+			viewMatrix.Translate(-alien.xPos, -alien.yPos, 0);
+
+			
+		}
+		else if (gameState == 2){
+			//alien.setPlayer(-alien.xPos + 4.0f, -alien.yPos - 4.0f, modelMatrix);
+			alien.collide();
+			alien.checkMovement();
 		
-		}
-		else {
-			alien.acceleration_x = 0;
 
+			float fixedElapsed = elapsed;
+			if (fixedElapsed > FIXED_TIMESTEP * MAX_TIMESTEPS) {
+				fixedElapsed = FIXED_TIMESTEP * MAX_TIMESTEPS;
+			}
+			while (fixedElapsed >= FIXED_TIMESTEP) {
+				fixedElapsed -= FIXED_TIMESTEP;
+				alien.movePlayer(FIXED_TIMESTEP);
+				//enemy1.moveEnemy(fixedElapsed);
+			}
 
-		}
+			render();
+			enemy1.xLimitRight = 3;
+			enemy1.xLimitLeft = -13;
+			enemy1.acceleration_x = 2;
+			enemy1.moveEnemy(0.0166);
+			enemy1.seePlayer(alien);
 
+			
+			if (!alien.isAlive){
+				Mix_PlayChannel(-1, deathSound, 0);
 
-		if (!alien.collidedBottom)
-		{
-			alien.acceleration_y -= 6.81;
-		}
-		else {
-			float penetration = fabs(alien.gridy * TILE_SIZE + (alien.yPos + TILE_SIZE / 2));
-			alien.setPlayer(0, penetration - 0.001);
-		}
+				gameState = 99;
+			}
 
-
-		render();
-	
-		float fixedElapsed = elapsed;
-		if (fixedElapsed > FIXED_TIMESTEP * MAX_TIMESTEPS) {
-			fixedElapsed = FIXED_TIMESTEP * MAX_TIMESTEPS;
-		}
-		while (fixedElapsed >= FIXED_TIMESTEP) {
-			fixedElapsed -= FIXED_TIMESTEP;
-			alien.movePlayer(FIXED_TIMESTEP);
-		}
-		alien.movePlayer(fixedElapsed);
-
-		alien.DrawSpriteSheetSprite(program, 21, 30, 30, placeX, placeY);
+			program->setModelMatrix(modelMatrixEnemy);
+			modelMatrixEnemy.identity();
+			enemy1.yPos = -9.801;
+			modelMatrixEnemy.Translate(40 + enemy1.xPos, -9.75, 0);
+			modelMatrix.identity();
+			alien.movePlayer(fixedElapsed);
+			enemy1.DrawSpriteSheetSprite(program, 169, 30, 30, placeX, placeY, modelMatrixEnemy);
 		
-		viewMatrix.identity();
-		viewMatrix.Translate(-alien.xPos, -alien.yPos, 0);
-	
+			alien.DrawSpriteSheetSprite(program, 21, 30, 30, placeX, placeY, modelMatrix);
+			//cout << "X: " << alien.xPos << " Y: " << alien.yPos << endl;
+			viewMatrix.identity();
+			viewMatrix.Translate(-alien.xPos, -alien.yPos, 0);
+
+		}
+		else if (gameState == 99){
+			
+			DrawText(program, fontTexture, death, 0.2f, 0.02f);
+
+			modelMatrix.identity();
+			modelMatrix.setPosition(-2.5, 1, 1);
+
+			program->setModelMatrix(modelMatrix);
+
+			if (keys[SDL_SCANCODE_SPACE]){
+
+				read(world1);
+				gameState = 1;
+				alien.setPlayer(-alien.xPos, -alien.yPos, modelMatrix);
+				alien.setPlayer(5.4f, -6.6f, modelMatrix);
+				alien.velocity_x = 0;
+				alien.velocity_y = 0;
+				alien.acceleration_x = 0;
+				alien.acceleration_y = 0;
+
+			}
+
+		}
+		
 		SDL_GL_SwapWindow(displayWindow);
 
 	}
-
-	
-
 
 	delete program;
 	delete levelData;

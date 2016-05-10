@@ -98,6 +98,11 @@
   <ItemGroup>
     <Text Include="world.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <Media Include="BackgroundMusic.mp3" />
+    <Media Include="death.mp3" />
+    <Media Include="death.wav" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
