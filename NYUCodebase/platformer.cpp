@@ -43,8 +43,6 @@ int mapHeight;
 Matrix modelMatrixForWorld;
 Matrix modelMatrix;
 Matrix modelMatrixEnemy;
-Matrix modelMatrixStart;
-Matrix modelMatrixDeath;
 Matrix projectionMatrix;
 Matrix viewMatrix;
 ShaderProgram *program;
@@ -930,14 +928,16 @@ void clearTheHeap(vector<H*>& vec)
 int main(int argc, char *argv[])
 {
 
-	//allows me to print to the console. only affects windows users.
+
+
+/*	//allows me to print to the console. only affects windows users.
 #ifdef _WIN32
 	AllocConsole();
 	freopen("conin$", "r", stdin);
 	freopen("conout$", "w", stdout);
 	freopen("conout$", "w", stderr);
 #endif
-
+	*/
 
 
 

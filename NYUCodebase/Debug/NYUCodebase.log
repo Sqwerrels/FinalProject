@@ -1,16 +1,9 @@
-﻿Build started 5/12/2016 2:15:46 PM.
+﻿Build started 5/12/2016 4:06:00 PM.
      1>Project "C:\Users\Kevin\Downloads\FinalProject\NYUCodebase\NYUCodebase.vcxproj" on node 2 (Build target(s)).
      1>Link:
-         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"C:\Users\Kevin\Downloads\FinalProject\Debug\NYUCodebase.exe" /INCREMENTAL /NOLOGO /LIBPATH:C:\SDL2_mixer\lib\x86 /LIBPATH:C:\SDL2\lib\x86 /LIBPATH:C:\SDL2_image\lib\x86 /LIBPATH:C:\glew\lib\Release\Win32 /LIBPATH:C:\SDL2_mixer\lib\x86 SDL2.lib SDL2_mixer.lib glew32.lib SDL2main.lib SDL2_image.lib OpenGL32.lib SDL2_mixer.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:\Users\Kevin\Downloads\FinalProject\Debug\NYUCodebase.pdb" /SUBSYSTEM:WINDOWS /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:\Users\Kevin\Downloads\FinalProject\Debug\NYUCodebase.lib" /MACHINE:X86 Debug\backup.obj
-         Debug\ClassDefGame.obj
-         Debug\Matrix.obj
-         Debug\platformer.obj
-         Debug\processData.obj
-         Debug\ShaderProgram.obj
-     1>MSVCRTD.lib(cinitexe.obj) : warning LNK4098: defaultlib 'msvcrt.lib' conflicts with use of other libs; use /NODEFAULTLIB:library
          NYUCodebase.vcxproj -> C:\Users\Kevin\Downloads\FinalProject\Debug\NYUCodebase.exe
      1>Done Building Project "C:\Users\Kevin\Downloads\FinalProject\NYUCodebase\NYUCodebase.vcxproj" (Build target(s)).
 
 Build succeeded.
 
-Time Elapsed 00:00:00.83
+Time Elapsed 00:00:00.17
