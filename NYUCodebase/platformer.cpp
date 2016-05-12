@@ -44,6 +44,7 @@ Matrix modelMatrixForWorld;
 Matrix modelMatrix;
 Matrix modelMatrixEnemy;
 Matrix modelMatrixStart;
+Matrix modelMatrixDeath;
 Matrix projectionMatrix;
 Matrix viewMatrix;
 ShaderProgram *program;
@@ -57,6 +58,11 @@ float placeX;
 float placeY;
 float speed;
 
+float screenShakeValue = 0.0f;
+float screenShakeSpeed = 5.0f;
+float screenShakeIntensity = .15f;
+
+float animationTime;
 
 int gameState;
 
@@ -92,11 +98,13 @@ bool isSolid(int ind) {
 		return true;
 	if (ind == 63)
 		return true;
-	if (ind == 92)
+	if (ind == 95)
 		return true;
 	if (ind == 332)
 		return true;
 	if (ind == 497)
+		return true;
+	if (ind == 511)
 		return true;
 	if (ind == 557)
 		return true;
@@ -110,7 +118,23 @@ bool isSolid(int ind) {
 		return true;
 	if (ind == 529)
 		return true;
-
+	if (ind == 185)
+		return true;
+	if (ind == 1)
+		return true;
+	if (ind == 33)
+		return true;
+	if (ind == 8)
+		return true;
+	if (ind == 128)
+		return true;
+	if (ind == 121)
+		return true;
+	if (ind == 515)
+		return true;
+	if (ind == 196)
+		return true;
+	
 
 	return false;
 
@@ -121,8 +145,12 @@ bool isSolid(int ind) {
 bool atEnd(int ind){
 	if (ind == 313)
 		return true;
+	if (ind == 137)
+		return true;
+	if (ind == 136)
+		return true;
 	return false;
-
+	
 
 }
 
@@ -139,7 +167,11 @@ bool isDead(int ind) {
 }
 
 
-void DrawText(ShaderProgram *program, int fontTexture, std::string text, float size, float spacing) {
+
+
+//Added my drawtext function. Only difference is that I added a x and y displacement so you can fiddle around with the position to get it on the place on the screen where you want it to be
+void DrawText(ShaderProgram *program, int fontTexture, std::string text, float size, float spacing, float xPosStart = 0, float yPosStart= 0) {
+
 	float texture_size = 1.0 / 16.0f;
 	std::vector<float> vertexData;
 	std::vector<float> texCoordData;
@@ -147,12 +179,12 @@ void DrawText(ShaderProgram *program, int fontTexture, std::string text, float s
 		float texture_x = (float)(((int)text[i]) % 16) / 16.0f;
 		float texture_y = (float)(((int)text[i]) / 16) / 16.0f;
 		vertexData.insert(vertexData.end(), {
-			((size + spacing) * i) + (-0.5f * size), 0.5f * size,
-			((size + spacing) * i) + (-0.5f * size), -0.5f * size,
-			((size + spacing) * i) + (0.5f * size), 0.5f * size,
-			((size + spacing) * i) + (0.5f * size), -0.5f * size,
-			((size + spacing) * i) + (0.5f * size), 0.5f * size,
-			((size + spacing) * i) + (-0.5f * size), -0.5f * size,
+			((size + spacing) * i+xPosStart) + (-0.5f * size ), 0.5f * size +yPosStart,
+			((size + spacing) * i+xPosStart) + (-0.5f * size ), -0.5f * size + yPosStart,
+			((size + spacing) * i+xPosStart) + (0.5f * size ), 0.5f * size + yPosStart,
+			((size + spacing) * i+xPosStart) + (0.5f * size ), -0.5f * size + yPosStart,
+			((size + spacing) * i+xPosStart) + (0.5f * size ), 0.5f * size + yPosStart,
+			((size + spacing) * i +xPosStart) + (-0.5f * size ), -0.5f * size + yPosStart,
 		});
 		texCoordData.insert(texCoordData.end(), {
 			texture_x, texture_y,
@@ -225,8 +257,9 @@ public:
 	bool collidedLeft = false;
 	bool collidedRight = false;
 	bool isAtEnd = false;
-	bool goingRight = true;
+	bool goingRight = false;
 	bool isAlive = true;
+	bool lookLeft;
 	string state;
 
 	Entity(float x, float y, int texture, float width, float velX, float velY, float accelX, float accelY, float fricX, float fricY, bool collide) : xPos(x), yPos(y), textureID(texture),
@@ -278,11 +311,16 @@ public:
 		}
 		else if (atEnd(levelData[gridy][gridx])){
 			isAtEnd = true;
-
 		}
 		else {
 			collidedRight = false;
 		}
+		worldToTileCoordinates(xPos - TILE_SIZE / 2, yPos, &gridx, &gridy);
+		if (atEnd(levelData[gridy][gridx])){
+			isAtEnd = true;
+
+		}
+		
 		worldToTileCoordinates(xPos - TILE_SIZE / 2, yPos, &gridx, &gridy);
 		if (isSolid(levelData[gridy][gridx])){
 			
@@ -295,7 +333,7 @@ public:
 		}
 	}
 
-	void moveEnemy(float elapsed) {
+	void moveEnemy(float elapsed, float shakeValue) {
 		if (state == "Patrol"){
 			if (xPos < xLimitRight && goingRight){
 				acceleration_x = 5;
@@ -311,11 +349,11 @@ public:
 			}
 		}
 		else if (state == "ChasingLeft" && xPos > xLimitLeft){
-			acceleration_x = -5;
+			acceleration_x = -10;
 
 		}
 		else if (state == "ChasingRight" && xPos < xLimitRight) {
-			acceleration_x = 5;
+			acceleration_x = 10;
 		}
 		else{
 			acceleration_x = 0;
@@ -331,7 +369,10 @@ public:
 
 
 		modelMatrixEnemy.identity();
+		
 		modelMatrixEnemy.Translate(xPos, yPos, 0);
+		modelMatrixEnemy.identity();
+		modelMatrixEnemy.Scale(1, -1, 0);
 		program->setModelMatrix(modelMatrixEnemy);
 
 	}
@@ -339,7 +380,7 @@ public:
 
 	void movePlayer(float elapsed)
 	{
-		if (velocity_x > 9 || velocity_x < -9){
+		if (velocity_x > 2 || velocity_x < -2){
 			acceleration_x = 0;
 		}
 		
@@ -360,7 +401,7 @@ public:
 
 		modelMatrix.identity();
 		modelMatrix.Translate(xPos, yPos, 0);
-		if (acceleration_x < 0)
+		if (lookLeft)
 			modelMatrix.Scale(-1, 1, 0);
 		program->setModelMatrix(modelMatrix);
 
@@ -372,7 +413,8 @@ public:
 		
 		}
 		else {
-			isAlive = true;;
+			isAlive = true;
+			
 		}
 
 
@@ -381,7 +423,7 @@ public:
 	
 	void checkMovement(){
 
-		if (keys[SDL_SCANCODE_RIGHT] && gridx < xLimitRight)
+		if (keys[SDL_SCANCODE_RIGHT])
 		{
 
 			float penetration;
@@ -389,6 +431,7 @@ public:
 
 				//alien.setPlayer(speed, 0);
 				acceleration_x = 10;
+				lookLeft = false;
 
 			}
 
@@ -402,11 +445,12 @@ public:
 
 
 		}
-		else if (keys[SDL_SCANCODE_LEFT] && xPos > xLimitLeft)
+		else if (keys[SDL_SCANCODE_LEFT])
 		{
 			float penetration;
 			if (!collidedLeft){
 				acceleration_x = -10;
+				lookLeft = true;
 			}
 			else {
 				velocity_x = 0;
@@ -423,10 +467,9 @@ public:
 		if (keys[SDL_SCANCODE_UP] && collidedBottom)
 		{
 			float penetration;
-			//Mix_PlayChannel(-1, deathSound, 0);
 			if (!collidedTop){
 				
-				acceleration_y = -50.81;
+				acceleration_y = -100.81;
 			}
 			else {
 				penetration = fabs(gridy * TILE_SIZE + (yPos + TILE_SIZE / 2));
@@ -476,7 +519,6 @@ public:
 			}
 			if (fabs(player.xPos - (xPos + 40)) < 0.25){
 				player.isAlive = false;
-				cout << "ur mum" << endl;
 			}
 		}
 		else {
@@ -599,9 +641,30 @@ void SheetSprite::Draw(ShaderProgram* program) {
 		glDisableVertexAttribArray(program->texCoordAttribute);
 }
 	
+/*
+class Particle {
+public:
+	Vector position;
+	Vector velocity;
+	float lifetime;
+};
 
 
+class ParticleEmitter {
+public:
+	ParticleEmitter(unsigned int particleCount);
+	ParticleEmitter();
+	~ParticleEmitter();
+	void Update(float elapsed);
+	void Render();
+	Vector position;
+	Vector gravity;
+	float maxLifetime;
+	std::vector<Particle> particles;
+};
 
+
+*/
 
 
 
@@ -632,8 +695,21 @@ GLuint LoadTextureRGBA(const char *image_path) {
 	SDL_FreeSurface(surface);
 	return textureID;
 }
+void moveViewMatrix(Matrix& viewM, float xPos, float yPos){
+	viewM.identity();	
+	float moveX = xPos;
+	float moveY = yPos;
+	
+	if (moveX <= -45)
+		moveX = -45;
+	else if (moveX >= -5.4)
+		moveX = -5.4;
+	if (moveY >= 9.3)
+		moveY = 9.3;
 
 
+	viewM.Translate(moveX, moveY, 0);
+}
 
 bool readHeader(std::ifstream &stream) {
 	string line;
@@ -793,7 +869,6 @@ bool readEntityData(std::ifstream &stream) {
 			getline(lineStream, yPosition, ',');
 			float placeX = atoi(xPosition.c_str()) / 30.0f * TILE_SIZE;
 			float placeY = atoi(yPosition.c_str()) / 30.0f * -TILE_SIZE;
-			cout << "X:" << placeX << " Y: " << placeY  << endl;
 		}
 	}
 	return true;
@@ -848,7 +923,7 @@ void clearTheHeap(vector<H*>& vec)
 	vec.clear();
 }
 
-
+	
 
 
 
@@ -893,16 +968,22 @@ int main(int argc, char *argv[])
 	bool done = false;
 	string world1 = "world.txt";
 	string world2 = "secondWorld.txt";
+	string world3 = "thirdWorld.txt";
 	read(world1);
 	sheet = LoadTexture("spritesheet.png");
 	sheet_rgba = LoadTextureRGBA("spritesheet_rgba.png");
 	GLuint fontTexture = LoadTextureRGBA("font2.png");
 	string welcome = "Press Space to start";
 	string death = "You died, press start to restart";
+	string victory = "Congratulation, You Won!";
 	float lastFrameTicks = 0.0f;
 	float ticks;
 	float elapsed;
+	float stateChangeTimer = 0.0f;
+	int nextGameState = -1;
+	int prevGameState = 0;
 	gameState = 0;
+	
 
 	Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 4096);
 	Mix_Chunk *deathSound = Mix_LoadWAV("death.wav");
@@ -939,6 +1020,8 @@ int main(int argc, char *argv[])
 			}
 
 		}
+
+
 		
 		ticks = (float)SDL_GetTicks() / 1000.0f;
 		elapsed = ticks - lastFrameTicks;
@@ -953,7 +1036,7 @@ int main(int argc, char *argv[])
 
 		if (gameState == 0){
 
-			DrawText(program, fontTexture, welcome, 0.2f, 0.02f);
+			DrawText(program, fontTexture, welcome, 0.2f, 0.02f, 0.6f, -1.0f);
 			
 			modelMatrix.identity();
 			modelMatrix.setPosition(-2.5, 1, 1);
@@ -989,13 +1072,7 @@ int main(int argc, char *argv[])
 				program->setModelMatrix(modelMatrixEnemy);
 			}
 
-			if (!alien.isAlive)
-			{
-				Mix_PlayChannel(-1, deathSound, 0);
-				gameState = 99;
-	
-			}
-
+			
 			render();
 
 			float fixedElapsed = elapsed;
@@ -1007,28 +1084,119 @@ int main(int argc, char *argv[])
 				alien.movePlayer(FIXED_TIMESTEP);
 			}
 			alien.movePlayer(fixedElapsed);
-
+			screenShakeValue += elapsed;
+			//modelMatrix.Scale(1, 1 + sin(screenShakeValue * screenShakeSpeed)* screenShakeIntensity, 0);
 			alien.DrawSpriteSheetSprite(program, 21, 30, 30, placeX, placeY, modelMatrix);
+			screenShakeValue += elapsed;
+			modelMatrix.identity();
+			modelMatrix.Scale(1.0f, sin(screenShakeValue * screenShakeSpeed)* screenShakeIntensity, 0.0f);
 			
-
-			/*
-			modelMatrixEnemy.identity();
-			modelMatrixEnemy.setPosition(alien.xPos, alien.yPos, 0);
-			*/
-
 			
 			program->setModelMatrix(modelMatrixEnemy);
 
-			viewMatrix.identity();
-			viewMatrix.Translate(-alien.xPos, -alien.yPos, 0);
+			
+			moveViewMatrix(viewMatrix, -alien.xPos, -alien.yPos);
+			
+			
+			if (!alien.isAlive)
+			{
 
+				modelMatrix.identity();
+				screenShakeSpeed = 100;
+				stateChangeTimer = 0;
+				prevGameState = 2;
+				nextGameState = 99;
+				gameState = -1;
+			}
+
+			
 			
 		}
 		else if (gameState == 2){
-			//alien.setPlayer(-alien.xPos + 4.0f, -alien.yPos - 4.0f, modelMatrix);
 			alien.collide();
 			alien.checkMovement();
+			alien.isPlayerDead();
+			if (alien.isAtEnd){
+				read(world3);
+				alien.isAtEnd = false;
+				alien.velocity_x = 0;
+				alien.velocity_y = 0;
+				alien.acceleration_x = 0;
+				alien.acceleration_y = 0;
+				gameState = 3;
+			}
+
+
+			float fixedElapsed = elapsed;
+			if (fixedElapsed > FIXED_TIMESTEP * MAX_TIMESTEPS) {
+				fixedElapsed = FIXED_TIMESTEP * MAX_TIMESTEPS;
+			}
+			while (fixedElapsed >= FIXED_TIMESTEP) {
+				fixedElapsed -= FIXED_TIMESTEP;
+				alien.movePlayer(FIXED_TIMESTEP);
+
+			}
+
+			render();
+			enemy1.xLimitRight = 2.5;
+			enemy1.xLimitLeft = -12.5;
+			enemy1.acceleration_x = 2;
+			screenShakeValue += elapsed;
+			
+			enemy1.seePlayer(alien);
+
+			
+			if (!alien.isAlive){
+				screenShakeSpeed = 100;
+				stateChangeTimer = 0;
+				prevGameState = 2;
+				nextGameState = 99;
+				gameState = -1;
+			}
+
+
+			program->setModelMatrix(modelMatrixEnemy);
+			modelMatrixEnemy.identity();
+			enemy1.yPos = -9.801;
+			if (enemy1.state == "ChasingLeft" || enemy1.state == "ChasingRight")
+				modelMatrixEnemy.Translate(40 + enemy1.xPos, -9.75 + sin(screenShakeValue * screenShakeSpeed)* screenShakeIntensity, 0);
+			else 
+				modelMatrixEnemy.Translate(40 + enemy1.xPos, -9.75, 0);
+			modelMatrix.identity();
+			alien.movePlayer(fixedElapsed);
+			enemy1.DrawSpriteSheetSprite(program, 169, 30, 30, placeX, placeY, modelMatrixEnemy);
 		
+			alien.DrawSpriteSheetSprite(program, 21, 30, 30, placeX, placeY, modelMatrix);
+
+			enemy1.moveEnemy(0.0166, sin(screenShakeValue * screenShakeSpeed)* screenShakeIntensity);
+			
+			moveViewMatrix(viewMatrix, -alien.xPos, -alien.yPos);
+			//viewMatrix.identity();
+			//viewMatrix.Translate(-alien.xPos, -alien.yPos, 0);
+
+		}
+		else if (gameState == 3) {
+		
+			alien.collide();
+			alien.checkMovement();
+			alien.isPlayerDead();
+
+
+
+			if (!alien.isAlive){
+				screenShakeSpeed = 100;
+				stateChangeTimer = 0;
+				nextGameState = 99;
+				prevGameState = 3;
+				gameState = -1;
+				
+			}
+
+			if (alien.isAtEnd){
+				gameState = 4;
+			}
+
+
 
 			float fixedElapsed = elapsed;
 			if (fixedElapsed > FIXED_TIMESTEP * MAX_TIMESTEPS) {
@@ -1041,42 +1209,21 @@ int main(int argc, char *argv[])
 			}
 
 			render();
-			enemy1.xLimitRight = 3;
-			enemy1.xLimitLeft = -13;
-			enemy1.acceleration_x = 2;
-			enemy1.moveEnemy(0.0166);
-			enemy1.seePlayer(alien);
-
 			
-			if (!alien.isAlive){
-				Mix_PlayChannel(-1, deathSound, 0);
-
-				gameState = 99;
-			}
-
-			program->setModelMatrix(modelMatrixEnemy);
-			modelMatrixEnemy.identity();
-			enemy1.yPos = -9.801;
-			modelMatrixEnemy.Translate(40 + enemy1.xPos, -9.75, 0);
-			modelMatrix.identity();
+			
 			alien.movePlayer(fixedElapsed);
-			enemy1.DrawSpriteSheetSprite(program, 169, 30, 30, placeX, placeY, modelMatrixEnemy);
-		
 			alien.DrawSpriteSheetSprite(program, 21, 30, 30, placeX, placeY, modelMatrix);
-			//cout << "X: " << alien.xPos << " Y: " << alien.yPos << endl;
-			viewMatrix.identity();
-			viewMatrix.Translate(-alien.xPos, -alien.yPos, 0);
+
+
+			moveViewMatrix(viewMatrix, -alien.xPos, -alien.yPos);
 
 		}
-		else if (gameState == 99){
-			
-			DrawText(program, fontTexture, death, 0.2f, 0.02f);
-
-			modelMatrix.identity();
-			modelMatrix.setPosition(-2.5, 1, 1);
-
+		else if (gameState == 4) {
+			alien.setPlayer(-1.0f, -6.6f, modelMatrix);
 			program->setModelMatrix(modelMatrix);
+			DrawText(program, fontTexture, victory, 0.2f, 0.01f, -3.2f);
 
+			
 			if (keys[SDL_SCANCODE_SPACE]){
 
 				read(world1);
@@ -1090,9 +1237,61 @@ int main(int argc, char *argv[])
 
 			}
 
+
+
+		}
+		else if (gameState == 99){
+			
+
+			modelMatrix.setScale(1, 1, 0);
+			
+			//alien.setPlayer(0.0f, -6.6f, modelMatrix);
+			//alien.setPlayer(-alien.xPos, -alien.yPos, modelMatrix);
+			
+			//modelMatrix.identity();
+			//modelMatrix.setPosition(0, 0, 0);
+
+			program->setModelMatrix(modelMatrix);
+			DrawText(program, fontTexture, death, 0.2f, 0.01f, -3.2f);
+
+			
+
+			if (keys[SDL_SCANCODE_SPACE]){
+				screenShakeIntensity = .15;
+				screenShakeSpeed = 5;
+				read(world1);
+				gameState = 1;
+				alien.setPlayer(-alien.xPos, -alien.yPos, modelMatrix);
+				alien.setPlayer(5.4f, -6.6f, modelMatrix);
+				alien.velocity_x = 0;
+				alien.velocity_y = 0;
+				alien.acceleration_x = 0;
+				alien.acceleration_y = 0;
+
+			}
+
+		}
+		else if (gameState == -1){
+			stateChangeTimer += elapsed;
+			render();
+			
+			screenShakeValue += elapsed;
+			viewMatrix.Translate(0.0f, sin(screenShakeValue * screenShakeSpeed)* screenShakeIntensity, 0.0f);
+			Mix_PlayChannel(-1, deathSound, 0);
+			if (stateChangeTimer >= 3 && nextGameState != -1){
+				gameState = nextGameState;
+				nextGameState = -1;
+			}
+			alien.DrawSpriteSheetSprite(program, 21, 30, 30, placeX, placeY, modelMatrix);
+			enemy1.DrawSpriteSheetSprite(program, 169, 30, 30, placeX, placeY, modelMatrixEnemy);
+
 		}
 		
 		SDL_GL_SwapWindow(displayWindow);
+
+		if (keys[SDL_SCANCODE_ESCAPE]){
+			done = true;
+		}
 
 	}
 
